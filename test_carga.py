@@ -12,4 +12,4 @@ df_filtrado = filtrar_productos(df, productos_validos)
 
 # Mostrar resultados
 print(f"\n✅ Se encontraron {len(df_filtrado)} filas para los productos válidos:")
-print(df_filtrado.head(15))
+print(df_filtrado.head(20))
