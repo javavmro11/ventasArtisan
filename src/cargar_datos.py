@@ -1,10 +1,15 @@
 import pandas as pd
 import os
 
-def cargar_datos(ruta_archivo):
+def cargar_datos(ruta_archivo="data/data.xlsx"):
+    """
+    Carga y limpia el archivo Excel de ventas.
+    Conserva solo: Fecha, Producto, Cantidad, Total
+    """
     try:
-        if not ruta_archivo:
-            raise ValueError("⚠️ No se ha proporcionado un archivo válido.")
+        if isinstance(ruta_archivo, str):
+            if not os.path.exists(ruta_archivo):
+                raise FileNotFoundError(f"❌ El archivo no existe: {ruta_archivo}")
 
         df = pd.read_excel(ruta_archivo, engine='openpyxl')
 
@@ -22,6 +27,9 @@ def cargar_datos(ruta_archivo):
         return df
 
     except Exception as e:
-        import streamlit as st
-        st.error(str(e))
+        try:
+            import streamlit as st
+            st.error(str(e))
+        except:
+            print(f"❌ Error: {e}")
         return pd.DataFrame()
