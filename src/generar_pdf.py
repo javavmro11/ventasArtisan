@@ -40,9 +40,55 @@ class PDF(FPDF):
         self.imagenes_temp.append(tmpfile.name)  # guardamos para borrar después
         self.image(tmpfile.name, x=x, y=y, w=60)
 
+    def insertar_tabla_resumen(self, resumen_df):
+        self.set_font("Helvetica", "B", 11)
+        self.cell(0, 10, "Resumen por Producto", ln=True)
+        self.ln(4)
+
+        # Encabezados
+        self.set_font("Helvetica", "B", 9)
+        self.set_fill_color(230, 230, 230)
+        self.cell(100, 8, "Producto", border=1, fill=True)
+        self.cell(30, 8, "Cantidad", border=1, fill=True)
+        self.cell(40, 8, "Monto", border=1, ln=True, fill=True)
+
+    # Filas
+        self.set_font("Helvetica", "", 9)
+        for index, row in resumen_df.iterrows():
+            producto = str(row["Producto"])
+            cantidad = str(row["Cantidad"])
+            monto = str(row["Monto"])
+
+            # Calcular altura necesaria según el texto
+            line_height = 8
+            producto_height = self.get_string_width(producto) / 90
+            lines = int(producto_height) + 1
+
+            # Verificar salto de página
+            if self.get_y() + (line_height * lines) > 270:
+                self.add_page()
+                self.set_font("Helvetica", "B", 9)
+                self.set_fill_color(230, 230, 230)
+                self.cell(100, 8, "Producto", border=1, fill=True)
+                self.cell(30, 8, "Cantidad", border=1, fill=True)
+                self.cell(40, 8, "Monto", border=1, ln=True, fill=True)
+                self.set_font("Helvetica", "", 9)
+
+            # Guardar posición actual
+            x = self.get_x()
+            y = self.get_y()
+
+            # Insertar celdas alineadas
+            self.multi_cell(100, line_height, producto, border=1)
+            self.set_xy(x + 100, y)
+            self.cell(30, line_height * lines, cantidad, border=1)
+            self.cell(40, line_height * lines, monto, border=1, ln=True)
+
+
 def exportar_pdf(resumen, agrupaciones, df_agrupado, campo_agrupacion, productos_seleccionados, tipo_agrupacion):
     pdf = PDF(tipo_agrupacion)
     pdf.add_page()
+    pdf.insertar_tabla_resumen(resumen)
 
     colores = plt.get_cmap("tab10").colors
     mapa_colores = {prod: colores[i % len(colores)] for i, prod in enumerate(productos_seleccionados)}
