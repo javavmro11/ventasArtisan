@@ -1,13 +1,14 @@
 from fpdf import FPDF
 import matplotlib.pyplot as plt
 from io import BytesIO
-import os
 import tempfile
+import os
 
 class PDF(FPDF):
     def __init__(self, tipo_agrupacion):
         super().__init__()
         self.tipo_agrupacion = tipo_agrupacion
+        self.imagenes_temp = []  # para limpiar luego
 
     def header(self):
         self.set_font("Arial", "B", 14)
@@ -16,42 +17,45 @@ class PDF(FPDF):
         self.cell(0, 10, f"Tipo de agrupación: {self.tipo_agrupacion}", ln=True, align="C")
         self.ln(5)
 
-    def leyendas_productos(self, productos):
+    def leyendas_productos(self, productos, cantidades, colores):
         self.set_font("Arial", "B", 10)
         self.cell(0, 10, "Productos seleccionados:", ln=True)
-        self.set_font("Arial", "", 10)
+        self.set_font("Arial", "", 9)
 
         for i in range(0, len(productos), 2):
-            linea = "  - " + productos[i]
-            if i + 1 < len(productos):
-                linea += "     |     - " + productos[i + 1]
+            linea = ""
+            for j in range(2):
+                if i + j < len(productos):
+                    producto = productos[i + j]
+                    cantidad = cantidades[i + j]
+                    color = colores[i + j]
+                    color_hex = '#%02x%02x%02x' % tuple(int(c * 255) for c in color)
+                    linea += f"- {producto} ({cantidad:.1f} und)   ".ljust(45)
             self.cell(0, 8, linea, ln=True)
-        self.ln(3)
+        self.ln(5)
 
-    def insertar_grafico(self, fig):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmpfile:
-            fig.savefig(tmpfile.name, format='png', dpi=150, bbox_inches='tight')
-            tmpfile.flush()
-            self.image(tmpfile.name, w=60)  # tamaño pequeño para 3 por fila
-
-        # 🔁 Elimina el archivo después de cerrar la figura (fuera del with)
-        try:
-            os.unlink(tmpfile.name)
-        except PermissionError:
-            pass  # Windows a veces bloquea el archivo si se usa muy rápido temporal
+    def insertar_grafico(self, fig, x, y):
+        tmpfile = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        fig.savefig(tmpfile.name, format='png', dpi=150, bbox_inches='tight')
+        self.imagenes_temp.append(tmpfile.name)  # guardamos para borrar después
+        self.image(tmpfile.name, x=x, y=y, w=60)
 
 def exportar_pdf(resumen, agrupaciones, df_agrupado, campo_agrupacion, productos_seleccionados, tipo_agrupacion):
     pdf = PDF(tipo_agrupacion)
     pdf.add_page()
 
-    # ✅ Leyendas de productos seleccionados
-    pdf.leyendas_productos(productos_seleccionados)
-
-    # ✅ Gráficos por agrupación (3 por fila)
     colores = plt.get_cmap("tab10").colors
     mapa_colores = {prod: colores[i % len(colores)] for i, prod in enumerate(productos_seleccionados)}
+    cantidades = [resumen[resumen["Producto"] == p]["Cantidad"].values[0] for p in productos_seleccionados]
+    colores_lista = [mapa_colores[p] for p in productos_seleccionados]
 
+    pdf.leyendas_productos(productos_seleccionados, cantidades, colores_lista)
+
+    # Dibujar gráficos de torta
+    x_positions = [15, 75, 135]
+    y = pdf.get_y()
     contador = 0
+
     for agrupador in agrupaciones:
         datos = df_agrupado[df_agrupado[campo_agrupacion] == agrupador]
         if datos.empty:
@@ -61,15 +65,29 @@ def exportar_pdf(resumen, agrupaciones, df_agrupado, campo_agrupacion, productos
         productos = datos["Producto"].tolist()
         colores_locales = [mapa_colores.get(p, (0.5, 0.5, 0.5)) for p in productos]
 
-        fig, ax = plt.subplots(figsize=(2.2, 2.2))
-        ax.pie(cantidades, labels=None, colors=colores_locales, startangle=90, textprops={'fontsize': 6})
+        fig, ax = plt.subplots(figsize=(2, 2))
+        ax.pie(cantidades, labels=None, colors=colores_locales, startangle=90)
         ax.set_title(str(agrupador), fontsize=8)
 
-        if contador % 3 == 0 and contador != 0:
-            pdf.ln(55)
-        pdf.insertar_grafico(fig)
-        contador += 1
+        x = x_positions[contador % 3]
+        pdf.insertar_grafico(fig, x, y)
 
-    # ✅ Codificación como binario para descargar en Streamlit
+        contador += 1
+        if contador % 3 == 0:
+            y += 60
+            if y > 240:
+                pdf.add_page()
+                y = 20
+
+    # Guardar PDF como binario
     pdf_bytes = pdf.output(dest='S').encode('latin-1')
-    return BytesIO(pdf_bytes)
+    buffer = BytesIO(pdf_bytes)
+
+    # ✅ Limpiar imágenes temporales
+    for img in pdf.imagenes_temp:
+        try:
+            os.remove(img)
+        except Exception:
+            pass
+
+    return buffer
