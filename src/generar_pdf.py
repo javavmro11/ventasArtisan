@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from io import BytesIO
 import tempfile
 import os
+import pandas as pd
 
 class PDF(FPDF):
     def __init__(self, tipo_agrupacion):
@@ -18,21 +19,25 @@ class PDF(FPDF):
         self.ln(5)
 
     def leyendas_productos(self, productos, cantidades, colores):
+        self.add_page()
         self.set_font("Arial", "B", 10)
         self.cell(0, 10, "Productos seleccionados:", ln=True)
         self.set_font("Arial", "", 9)
 
+        col_width = 95
+        row_height = 6
         for i in range(0, len(productos), 2):
-            linea = ""
             for j in range(2):
                 if i + j < len(productos):
                     producto = productos[i + j]
                     cantidad = cantidades[i + j]
                     color = colores[i + j]
-                    color_hex = '#%02x%02x%02x' % tuple(int(c * 255) for c in color)
-                    linea += f"- {producto} ({cantidad:.1f} und)   ".ljust(45)
-            self.cell(0, 8, linea, ln=True)
-        self.ln(5)
+                    r, g, b = [int(c * 255) for c in color]
+                    self.set_fill_color(r, g, b)
+                    self.cell(5, row_height, "", fill=True, border=1)
+                    self.cell(col_width - 5, row_height, f"{producto} ({cantidad:.1f} und)", border=0)
+            self.ln(row_height + 1)
+        self.ln(3)
 
     def insertar_grafico(self, fig, x, y):
         tmpfile = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
@@ -52,7 +57,7 @@ class PDF(FPDF):
         self.cell(30, 8, "Cantidad", border=1, fill=True)
         self.cell(40, 8, "Monto", border=1, ln=True, fill=True)
 
-    # Filas
+        # Filas
         self.set_font("Helvetica", "", 9)
         for index, row in resumen_df.iterrows():
             producto = str(row["Producto"])
@@ -83,7 +88,6 @@ class PDF(FPDF):
             self.set_xy(x + 100, y)
             self.cell(30, line_height * lines, cantidad, border=1)
             self.cell(40, line_height * lines, monto, border=1, ln=True)
-
 
 def exportar_pdf(resumen, agrupaciones, df_agrupado, campo_agrupacion, productos_seleccionados, tipo_agrupacion):
     pdf = PDF(tipo_agrupacion)
