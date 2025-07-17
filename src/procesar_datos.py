@@ -8,7 +8,8 @@ from src.generar_pdf import exportar_pdf
 def formatear_miles(valor):
     return f"${valor:,.0f}".replace(",", ".") + " $"
 
-def interfaz_procesar(df_filtrado):
+# 🟡 Ahora recibe nombre_sucursal como argumento
+def interfaz_procesar(df_filtrado, nombre_sucursal=""):
     st.header("📊 Procesamiento de Datos")
     df_filtrado = df_filtrado.copy()
     if 'Total' in df_filtrado.columns:
@@ -134,7 +135,8 @@ def interfaz_procesar(df_filtrado):
                 tipo_agrupacion=st.session_state["tipo_agrupacion"],
                 agrupaciones=st.session_state["agrupaciones"],
                 df_agrupado=st.session_state["df_agrupado"],
-                campo_agrupacion=st.session_state["campo_agrupacion"]
+                campo_agrupacion=st.session_state["campo_agrupacion"],
+                nombre_sucursal=nombre_sucursal  # ✅ nuevo argumento
             )
 
             st.download_button(
